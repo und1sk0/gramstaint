@@ -41,13 +41,13 @@ Output goes to `followers.csv` by default. Use `--output` to change it:
 uv run gramstaint.py scrape --full --output ~/Desktop/followers.csv
 ```
 
-Limit and batch size for testing or rate-limit caution:
+Cap the number of followers fetched (useful for testing):
 
 ```bash
-uv run gramstaint.py scrape --limit 100 --batch 20
+uv run gramstaint.py scrape --limit 100
 ```
 
-`--limit` caps the number of followers fetched. The following list is always fetched in full so mutual detection is accurate.
+The following list is always fetched in full so mutual detection is accurate. Instagram controls the page size (~25 per request).
 
 ### 3. Review the CSV
 

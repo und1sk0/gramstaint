@@ -3,10 +3,10 @@
 gramstaint — enumerate Instagram followers, score them, export to CSV.
 
 Usage:
-    uv run gramstaint.py login                                     # authenticate and save token to .creds/
-    uv run gramstaint.py scrape [--full] [--limit N] [--batch N]  # list followers (--full adds per-user stats)
-    uv run gramstaint.py remove <csv_file>                         # remove followers marked remove=true in csv
-    uv run gramstaint.py token                                     # print bearer token + headers for raw API use
+    uv run gramstaint.py login                              # authenticate and save token to .creds/
+    uv run gramstaint.py scrape [--full] [--limit N]        # list followers (--full adds per-user stats)
+    uv run gramstaint.py remove <csv_file>                  # remove followers marked remove=true in csv
+    uv run gramstaint.py token                              # print bearer token + headers for raw API use
 """
 
 import argparse
@@ -159,18 +159,18 @@ def get_client() -> Client:
 # ---------------------------------------------------------------------------
 
 def fetch_list(cl: Client, fetch_fn, user_id: str, label: str,
-               limit: int = 0, batch: int = 0) -> dict:
+               limit: int = 0) -> dict:
     """Paginate a follower/following endpoint, returning {str(pk): UserShort}.
 
     limit: stop after N total results (0 = no limit)
-    batch: max_amount hint passed to each API chunk (0 = server default)
+    Instagram controls the actual page size (~25 per request).
     """
     results = {}
     max_id = ""
     page = 1
     while True:
         chunk, max_id = with_backoff(
-            fetch_fn, user_id, max_amount=batch, max_id=max_id, label=f"{label} p{page}"
+            fetch_fn, user_id, max_id=max_id, label=f"{label} p{page}"
         )
         for user in chunk:
             results[str(user.pk)] = user  # normalize pk to str for consistent keying
@@ -203,20 +203,18 @@ def fetch_user_stats(cl: Client, users: dict) -> dict:
     return enriched
 
 
-def scrape(cl: Client, output: Path = DEFAULT_OUTPUT, full: bool = False,
-           limit: int = 0, batch: int = 0):
+def scrape(cl: Client, output: Path = DEFAULT_OUTPUT, full: bool = False, limit: int = 0):
     me = getattr(cl, "_me", None) or cl.user_info(cl.user_id)
     my_id = str(cl.user_id)
     print(f"Logged in as @{me.username} (id={my_id})\n")
 
     print("Fetching followers...")
     followers_short = fetch_list(cl, cl.user_followers_v1_chunk, my_id, "followers",
-                                 limit=limit, batch=batch)
+                                 limit=limit)
 
     # following is always fetched without a limit so mutuals detection is complete
     print("\nFetching following...")
-    following_short = fetch_list(cl, cl.user_following_v1_chunk, my_id, "following",
-                                 batch=batch)
+    following_short = fetch_list(cl, cl.user_following_v1_chunk, my_id, "following")
 
     mutual_pks = set(followers_short.keys()) & set(following_short.keys())
     print(f"\nFollowers: {len(followers_short)}  |  Following: {len(following_short)}  |  Mutuals: {len(mutual_pks)}")
@@ -317,8 +315,6 @@ def main():
                           help="fetch per-user stats (follower/following/post counts)")
     p_scrape.add_argument("--limit", type=int, default=0, metavar="N",
                           help="stop after N followers (default: all)")
-    p_scrape.add_argument("--batch", type=int, default=0, metavar="N",
-                          help="API chunk size per page request (default: server default)")
 
     p_remove = sub.add_parser("remove", help="remove followers marked remove=true in csv")
     p_remove.add_argument("csv_file")
@@ -332,7 +328,7 @@ def main():
     cl = get_client()
 
     if args.cmd == "scrape":
-        scrape(cl, output=args.output, full=args.full, limit=args.limit, batch=args.batch)
+        scrape(cl, output=args.output, full=args.full, limit=args.limit)
     elif args.cmd == "remove":
         remove(cl, args.csv_file)
     elif args.cmd == "token":
