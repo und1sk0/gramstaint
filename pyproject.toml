@@ -7,6 +7,9 @@ dependencies = [
     "instagrapi>=2.10.4",
 ]
 
+[project.scripts]
+gramstaint = "gramstaint:main"
+
 [dependency-groups]
 dev = [
     "ruff>=0.9",

@@ -7,8 +7,18 @@ Enumerate your Instagram followers, score them for botness, and bulk-remove the 
 - Python 3.13+
 - [uv](https://github.com/astral-sh/uv)
 
+## Install
+
 ```bash
-uv sync
+uv tool install --editable .
+```
+
+This puts a `gramstaint` command in your PATH (`~/.local/bin/`). The `--editable` flag means changes to the source are reflected immediately without reinstalling.
+
+To uninstall:
+
+```bash
+uv tool uninstall gramstaint
 ```
 
 ## Usage
@@ -18,38 +28,46 @@ uv sync
 Authenticate once. Credentials are never written to disk — only a session token is saved to `.creds/token.json`.
 
 ```bash
-uv run gramstaint.py login
+gramstaint login
 ```
 
-### 2. Scrape followers
+### 2. Look up a user
+
+```bash
+gramstaint user <username|id>
+```
+
+Accepts a username (with or without `@`) or a numeric user ID. Add `--verbose` to dump the raw JSON response.
+
+### 3. Scrape followers
 
 **Fast mode** — list only (no per-user API calls):
 
 ```bash
-uv run gramstaint.py scrape
+gramstaint scrape
 ```
 
 **Full mode** — includes follower/following/post counts per account:
 
 ```bash
-uv run gramstaint.py scrape --full
+gramstaint scrape --full
 ```
 
 Output goes to `followers.csv` by default. Use `--output` to change it:
 
 ```bash
-uv run gramstaint.py scrape --full --output ~/Desktop/followers.csv
+gramstaint scrape --full --output ~/Desktop/followers.csv
 ```
 
 Cap the number of followers fetched (useful for testing):
 
 ```bash
-uv run gramstaint.py scrape --limit 100
+gramstaint scrape --limit 100
 ```
 
 The following list is always fetched in full so mutual detection is accurate. Instagram controls the page size (~25 per request).
 
-### 3. Review the CSV
+### 4. Review the CSV
 
 Open `followers.csv` in a spreadsheet. Columns:
 
@@ -69,20 +87,20 @@ Open `followers.csv` in a spreadsheet. Columns:
 
 Bot signals to look for: `is_mutual=False`, `media_count=0`, `following_count` in the thousands, `low_id=False`.
 
-### 4. Remove
+### 5. Remove
 
 Set `remove=true` on any rows you want gone, then:
 
 ```bash
-uv run gramstaint.py remove followers.csv
+gramstaint remove followers.csv
 ```
 
-### 5. Token (for raw API access)
+### 6. Token (for raw API access)
 
 Print the bearer token and example `curl` command for direct API calls:
 
 ```bash
-uv run gramstaint.py token
+gramstaint token
 ```
 
 ## Persistence
