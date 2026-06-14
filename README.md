@@ -10,10 +10,24 @@ Enumerate your Instagram followers, score them for botness, and bulk-remove the 
 ## Install
 
 ```bash
+uv tool install git+https://github.com/und1sk0/gramstaint
+```
+
+This puts a `gramstaint` command in your PATH (`~/.local/bin/`).
+
+To install a specific release:
+
+```bash
+uv tool install "git+https://github.com/und1sk0/gramstaint@v0.2.0"
+```
+
+**For local development:**
+
+```bash
 uv tool install --editable .
 ```
 
-This puts a `gramstaint` command in your PATH (`~/.local/bin/`). The `--editable` flag means changes to the source are reflected immediately without reinstalling.
+The `--editable` flag means changes to the source are reflected immediately without reinstalling.
 
 To uninstall:
 
