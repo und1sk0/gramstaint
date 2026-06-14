@@ -5,6 +5,7 @@ gramstaint — enumerate Instagram followers, score them, export to CSV.
 Usage:
     uv run gramstaint.py login                     # authenticate and save token to .creds/
     uv run gramstaint.py scrape [--full] [--limit N] [--skip-mutuals]
+    uv run gramstaint.py user <username|id> [--verbose]
     uv run gramstaint.py remove <csv_file>         # remove followers marked remove=true in csv
     uv run gramstaint.py token                     # print bearer token + headers for raw API use
 """
@@ -320,6 +321,49 @@ def remove(cl: Client, csv_file: str):
 
 
 # ---------------------------------------------------------------------------
+# User detail
+# ---------------------------------------------------------------------------
+
+
+def cmd_user(cl: Client, target: str, verbose: bool = False):
+    # resolve username -> pk if target doesn't look like a numeric ID
+    if target.lstrip("@").isdigit():
+        pk = int(target.lstrip("@"))
+    else:
+        pk = cl.user_id_from_username(target.lstrip("@"))
+
+    user = with_backoff(cl.user_info, pk, label=f"user:{target}")
+
+    if verbose:
+        print(json.dumps(user.model_dump(), indent=2, default=str))
+        return
+
+    bio = (user.biography or "").replace("\n", " ")
+    ext = getattr(user, "external_url", "") or ""
+    category = getattr(user, "category", "") or ""
+    old_account = int(str(pk)) < OLD_ID_THRESHOLD
+
+    lines = [
+        f"@{user.username}  (id={pk})",
+        f"  Name:       {user.full_name}",
+        f"  Followers:  {user.follower_count:,}",
+        f"  Following:  {user.following_count:,}",
+        f"  Posts:      {user.media_count:,}",
+        f"  Private:    {user.is_private}",
+        f"  Verified:   {user.is_verified}",
+        f"  Old acct:   {old_account}  (id < 2B → pre-~2015)",
+    ]
+    if category:
+        lines.append(f"  Category:   {category}")
+    if bio:
+        lines.append(f"  Bio:        {bio}")
+    if ext:
+        lines.append(f"  URL:        {ext}")
+
+    print("\n".join(lines))
+
+
+# ---------------------------------------------------------------------------
 # Token
 # ---------------------------------------------------------------------------
 
@@ -371,6 +415,10 @@ def main():
         help="skip following fetch (faster, no mutual detection)",
     )
 
+    p_user = sub.add_parser("user", help="show profile details for a user")
+    p_user.add_argument("target", metavar="username|id", help="Instagram username or numeric ID")
+    p_user.add_argument("--verbose", "-v", action="store_true", help="dump raw JSON response")
+
     p_remove = sub.add_parser("remove", help="remove followers marked remove=true in csv")
     p_remove.add_argument("csv_file")
 
@@ -386,6 +434,8 @@ def main():
         scrape(
             cl, output=args.output, full=args.full, limit=args.limit, skip_mutuals=args.skip_mutuals
         )
+    elif args.cmd == "user":
+        cmd_user(cl, args.target, verbose=args.verbose)
     elif args.cmd == "remove":
         remove(cl, args.csv_file)
     elif args.cmd == "token":
