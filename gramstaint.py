@@ -3,35 +3,34 @@
 gramstaint — enumerate Instagram followers, score them, export to CSV.
 
 Usage:
-    uv run gramstaint.py login                              # authenticate and save token to .creds/
-    uv run gramstaint.py scrape [--full] [--limit N] [--skip-mutuals]  # list followers (--full adds per-user stats)
-    uv run gramstaint.py remove <csv_file>                  # remove followers marked remove=true in csv
-    uv run gramstaint.py token                              # print bearer token + headers for raw API use
+    uv run gramstaint.py login                     # authenticate and save token to .creds/
+    uv run gramstaint.py scrape [--full] [--limit N] [--skip-mutuals]
+    uv run gramstaint.py remove <csv_file>         # remove followers marked remove=true in csv
+    uv run gramstaint.py token                     # print bearer token + headers for raw API use
 """
 
 import argparse
 import csv
 import json
 import os
+import random
 import sys
 import time
-import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import requests.exceptions
 from instagrapi import Client
-from instagrapi.exceptions import TwoFactorRequired, ClientError
+from instagrapi.exceptions import ClientError, TwoFactorRequired
 
-
-SESSION_FILE   = Path("session.json")
-TOKEN_FILE     = Path(".creds/token.json")
+SESSION_FILE = Path("session.json")
+TOKEN_FILE = Path(".creds/token.json")
 DEFAULT_OUTPUT = Path("followers.csv")
 
 # Seconds to wait between paginated list fetches
-PAGE_DELAY   = (0.5, 1.0)
+PAGE_DELAY = (0.5, 1.0)
 # Seconds to wait between per-user info fetches
-INFO_DELAY   = (0.1, 1.0)
+INFO_DELAY = (0.1, 1.0)
 # Seconds to wait between follower removals
 REMOVE_DELAY = (0.5, 1.0)
 
@@ -45,8 +44,8 @@ CSV_FIELDS = [
     "is_private",
     "is_verified",
     "is_mutual",
-    "low_id",   # True if numeric ID suggests an older account
-    "remove",   # blank by default — fill in True in the CSV to bulk-remove
+    "low_id",  # True if numeric ID suggests an older account
+    "remove",  # blank by default — fill in True in the CSV to bulk-remove
 ]
 
 # Accounts created before ~2015 tend to have IDs below this threshold.
@@ -59,6 +58,7 @@ _RETRYABLE = (ClientError, OSError, requests.exceptions.RequestException)
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def jitter(range_: tuple) -> None:
     time.sleep(random.uniform(*range_))
@@ -77,7 +77,7 @@ def with_backoff(fn, *args, retries=4, label="request", **kwargs):
         except _RETRYABLE as e:
             if attempt == retries - 1:
                 raise
-            wait = delay * (2 ** attempt) + random.uniform(0, 5)
+            wait = delay * (2**attempt) + random.uniform(0, 5)
             print(f"\n  [{label}] error: {e}. Retrying in {wait:.0f}s...")
             time.sleep(wait)
 
@@ -85,6 +85,7 @@ def with_backoff(fn, *args, retries=4, label="request", **kwargs):
 # ---------------------------------------------------------------------------
 # Token persistence
 # ---------------------------------------------------------------------------
+
 
 def load_token() -> str:
     if not TOKEN_FILE.exists():
@@ -106,6 +107,7 @@ def save_token(tok: str) -> None:
 # ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
+
 
 def _fresh_login(cl: Client, username: str, password: str) -> None:
     """Perform a full login, handling 2FA. u/p never written to disk."""
@@ -162,8 +164,7 @@ def get_client() -> Client:
 CHUNK_SIZE = 25  # match Instagram's actual page size — one HTTP request per chunk call
 
 
-def fetch_list(cl: Client, fetch_fn, user_id: str, label: str,
-               limit: int = 0) -> dict:
+def fetch_list(cl: Client, fetch_fn, user_id: str, label: str, limit: int = 0) -> dict:
     """Paginate a follower/following endpoint, returning {str(pk): UserShort}.
 
     limit: stop after N total results (0 = no limit)
@@ -228,32 +229,38 @@ def write_csv(rows: list, path: Path) -> None:
 def build_rows(users: dict, mutual_pks: set) -> list:
     rows = []
     for pk, user in users.items():
-        rows.append({
-            "user_id":         pk,
-            "username":        user.username,
-            "full_name":       user.full_name,
-            "follower_count":  _stat(user, "follower_count"),
-            "following_count": _stat(user, "following_count"),
-            "media_count":     _stat(user, "media_count"),
-            "is_private":      user.is_private,
-            "is_verified":     user.is_verified,
-            "is_mutual":       pk in mutual_pks,
-            "low_id":          int(pk) < OLD_ID_THRESHOLD,
-            "remove":          "",
-        })
+        rows.append(
+            {
+                "user_id": pk,
+                "username": user.username,
+                "full_name": user.full_name,
+                "follower_count": _stat(user, "follower_count"),
+                "following_count": _stat(user, "following_count"),
+                "media_count": _stat(user, "media_count"),
+                "is_private": user.is_private,
+                "is_verified": user.is_verified,
+                "is_mutual": pk in mutual_pks,
+                "low_id": int(pk) < OLD_ID_THRESHOLD,
+                "remove": "",
+            }
+        )
     rows.sort(key=lambda r: (not r["is_mutual"], r["username"].lower()))
     return rows
 
 
-def scrape(cl: Client, output: Path = DEFAULT_OUTPUT, full: bool = False,
-           limit: int = 0, skip_mutuals: bool = False):
+def scrape(
+    cl: Client,
+    output: Path = DEFAULT_OUTPUT,
+    full: bool = False,
+    limit: int = 0,
+    skip_mutuals: bool = False,
+):
     me = getattr(cl, "_me", None) or cl.user_info(cl.user_id)
     my_id = str(cl.user_id)
     print(f"Logged in as @{me.username} (id={my_id})\n")
 
     print("Fetching followers...")
-    followers_short = fetch_list(cl, cl.user_followers_v1_chunk, my_id, "followers",
-                                 limit=limit)
+    followers_short = fetch_list(cl, cl.user_followers_v1_chunk, my_id, "followers", limit=limit)
     write_csv(build_rows(followers_short, set()), output)
     print(f"  checkpoint -> {output}")
 
@@ -265,7 +272,8 @@ def scrape(cl: Client, output: Path = DEFAULT_OUTPUT, full: bool = False,
         print("\nFetching following...")
         following_short = fetch_list(cl, cl.user_following_v1_chunk, my_id, "following")
         mutual_pks = set(followers_short.keys()) & set(following_short.keys())
-        print(f"\nFollowers: {len(followers_short)}  |  Following: {len(following_short)}  |  Mutuals: {len(mutual_pks)}")
+        nf, ng, nm = len(followers_short), len(following_short), len(mutual_pks)
+        print(f"\nFollowers: {nf}  |  Following: {ng}  |  Mutuals: {nm}")
 
         # update CSV with mutual flags now that we have following data
         write_csv(build_rows(followers_short, mutual_pks), output)
@@ -279,13 +287,14 @@ def scrape(cl: Client, output: Path = DEFAULT_OUTPUT, full: bool = False,
 
     write_csv(build_rows(followers, mutual_pks), output)
     print(f"\nWrote {len(followers)} rows -> {output}")
-    print(f"Open the CSV, set remove=true on unwanted accounts, then run:")
+    print("Open the CSV, set remove=true on unwanted accounts, then run:")
     print(f"  uv run gramstaint.py remove {output}")
 
 
 # ---------------------------------------------------------------------------
 # Removal
 # ---------------------------------------------------------------------------
+
 
 def remove(cl: Client, csv_file: str):
     targets = []
@@ -314,13 +323,14 @@ def remove(cl: Client, csv_file: str):
 # Token
 # ---------------------------------------------------------------------------
 
+
 def show_token(cl: Client):
     print("\n# Bearer token (valid until session expires)\n")
     print(f"Authorization: {cl.authorization}")
     print(f"User-Agent: {cl.user_agent}")
     print(f"X-IG-App-ID: {cl.app_id}")
-    print(f"\n# curl example:")
-    print(f'curl -s "https://i.instagram.com/api/v1/accounts/current_user/?edit=true" \\')
+    print("\n# curl example:")
+    print('curl -s "https://i.instagram.com/api/v1/accounts/current_user/?edit=true" \\')
     print(f'  -H "Authorization: {cl.authorization}" \\')
     print(f'  -H "User-Agent: {cl.user_agent}" \\')
     print(f'  -H "X-IG-App-ID: {cl.app_id}"')
@@ -330,23 +340,36 @@ def show_token(cl: Client):
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 def main():
-    parser = argparse.ArgumentParser(prog="gramstaint", description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        prog="gramstaint", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("login", help="authenticate and save token to .creds/")
     sub.add_parser("token", help="print bearer token + headers for raw API use")
 
     p_scrape = sub.add_parser("scrape", help="list followers [--full adds per-user stats]")
-    p_scrape.add_argument("--output", "-o", type=Path, default=DEFAULT_OUTPUT, metavar="FILE",
-                          help=f"output CSV path (default: {DEFAULT_OUTPUT})")
-    p_scrape.add_argument("--full", action="store_true",
-                          help="fetch per-user stats (follower/following/post counts)")
-    p_scrape.add_argument("--limit", type=int, default=0, metavar="N",
-                          help="stop after N followers (default: all)")
-    p_scrape.add_argument("--skip-mutuals", action="store_true",
-                          help="skip following fetch (faster, no mutual detection)")
+    p_scrape.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        default=DEFAULT_OUTPUT,
+        metavar="FILE",
+        help=f"output CSV path (default: {DEFAULT_OUTPUT})",
+    )
+    p_scrape.add_argument(
+        "--full", action="store_true", help="fetch per-user stats (follower/following/post counts)"
+    )
+    p_scrape.add_argument(
+        "--limit", type=int, default=0, metavar="N", help="stop after N followers (default: all)"
+    )
+    p_scrape.add_argument(
+        "--skip-mutuals",
+        action="store_true",
+        help="skip following fetch (faster, no mutual detection)",
+    )
 
     p_remove = sub.add_parser("remove", help="remove followers marked remove=true in csv")
     p_remove.add_argument("csv_file")
@@ -360,8 +383,9 @@ def main():
     cl = get_client()
 
     if args.cmd == "scrape":
-        scrape(cl, output=args.output, full=args.full, limit=args.limit,
-               skip_mutuals=args.skip_mutuals)
+        scrape(
+            cl, output=args.output, full=args.full, limit=args.limit, skip_mutuals=args.skip_mutuals
+        )
     elif args.cmd == "remove":
         remove(cl, args.csv_file)
     elif args.cmd == "token":
