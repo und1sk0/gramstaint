@@ -1,0 +1,8 @@
+[project]
+name = "gramstaint"
+version = "0.1.0"
+description = "Enumerate, score, and bulk-remove Instagram followers"
+requires-python = ">=3.13"
+dependencies = [
+    "instagrapi>=2.10.4",
+]
