@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
-"""
-gramstaint — enumerate Instagram followers, score them, export to CSV.
-
-Usage:
-    uv run gramstaint.py login                     # authenticate and save token to .creds/
-    uv run gramstaint.py scrape [--full] [--limit N] [--skip-mutuals]
-    uv run gramstaint.py user <username|id> [--verbose]
-    uv run gramstaint.py remove <csv_file>         # remove followers marked remove=true in csv
-    uv run gramstaint.py token                     # print bearer token + headers for raw API use
-"""
+"""gramstaint — enumerate Instagram followers, score them, export to CSV."""
 
 import argparse
 import csv
@@ -386,9 +377,7 @@ def show_token(cl: Client):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        prog="gramstaint", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    parser = argparse.ArgumentParser(prog="gramstaint", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("login", help="authenticate and save token to .creds/")
